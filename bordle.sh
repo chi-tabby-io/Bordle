@@ -35,17 +35,25 @@ INSTRUCTIONS+=( "   b. If a letter is in the word and in the correct position, I
 INSTRUCTIONS+=( "   c. If a letter is not in the word, I will not mark it at all.                          " )
 INSTRUCTIONS+=( "3. Repeats are allowed.                                                                   " )
 
-CELL_WIDTH=10
-CELL_HEIGHT=4
-N_CELL_WIDE=5
-N_CELL_HIGH=6
-N_CHAR_WIDTH=$(( CELL_WIDTH * N_CELL_WIDE + N_CELL_WIDE + 1 ))	
-N_CHAR_HEIGHT=$(( CELL_HEIGHT * N_CELL_HIGH + N_CELL_HIGH + 1 )) 
+GAME_BOARD_CELL_WIDTH=10
+GAME_BOARD_CELL_HEIGHT=4
+GAME_BOARD_NUM_CELL_WIDE=5
+GAME_BOARD_NUM_CELL_HIGH=6
+GAME_BOARD_N_CHAR_WIDTH=$(( GAME_BOARD_CELL_WIDTH * GAME_BOARD_NUM_CELL_WIDE + GAME_BOARD_NUM_CELL_WIDE + 1 ))	
+GAME_BOARD_N_CHAR_HEIGHT=$(( GAME_BOARD_CELL_HEIGHT * GAME_BOARD_NUM_CELL_HIGH + GAME_BOARD_NUM_CELL_HIGH + 1 )) 
 
+KEY_BOARD_CELL_WIDTH=3
+KEY_BOARD_CELL_HEIGHT=1
+KEY_BOARD_NUM_CELL_WIDE=( 10 9 7 )
+KEY_BOARD_NUM_CELL_HIGH=3
+KEY_BOARD_N_CHAR_WIDTH=$(( KEY_BOARD_CELL_WIDTH * ${KEY_BOARD_NUM_CELL_WIDE[0]} + ${KEY_BOARD_NUM_CELL_WIDE[0]} + 1 ))
+KEY_BOARD_N_CHAR_HEIGHT=$(( KEY_BOARD_CELL_HEIGHT * KEY_BOARD_NUM_CELL_HIGH + KEY_BOARD_NUM_CELL_HIGH + 1 ))
+
+QWERTY_KEY_BOARD=( "qwertyuiop" "asdfghjkl" "zxcvbnm" )
 # ========================= TUI FUNCTIONS ===============================
 
 # $1 == cursor_x $2 == cursor_y
-print_wordle_text() {
+draw_wordle_text() {
 	cursor_x=$1
 	cursor_y=$2
 	
@@ -58,7 +66,7 @@ print_wordle_text() {
 	done
 }
 
-print_welcome_screen() {
+draw_welcome_screen() {
 	clear
 	welcome_str="Welcome to:"
 
@@ -69,11 +77,11 @@ print_welcome_screen() {
 
 	(( cursor_x += 3 ))
 	(( cursor_y = ( WIDTH / 2 ) - ( ${#BORDLE_TEXT[1]} / 2 ) ))	
-	print_wordle_text $cursor_x $cursor_y
+	draw_wordle_text $cursor_x $cursor_y
 	
 	(( cursor_x += 2 ))	
 	(( cursor_y = ( WIDTH / 2 ) - ( GAME_RULES_LEN / 2 ) ))
-	print_instructions $cursor_x $cursor_y 
+	draw_instructions $cursor_x $cursor_y 
 
 	user_prompt="[INFO] To continue, press any key"
 	(( cursor_x += 2 ))	
@@ -84,7 +92,7 @@ print_welcome_screen() {
 }
 
 # $1 == cursor_x $2 == cursor_y 
-print_instructions() {
+draw_instructions() {
 	cursor_x=$1
 	cursor_y=$2
 
@@ -113,62 +121,106 @@ print_instructions() {
 }
 
 # $1 == cursor_x $2 == cursor_y
-print_empty_table() {
+draw_empty_table() {
 	cursor_x=$1
-	cursor_y=$2	
+	init_cursor_y=$2	
+	cursor_y=$init_cursor_y
 
 	tput cup $cursor_x $cursor_y	
-	for (( i=1; i<=$N_CHAR_HEIGHT; i++ ))	
+	for (( i=1; i<=$GAME_BOARD_N_CHAR_HEIGHT; i++ ))	
 	do
-		if [ $(( i % ( CELL_HEIGHT + 1 ) )) -eq 1 ]
+		if [ $(( i % ( GAME_BOARD_CELL_HEIGHT + 1 ) )) -eq 1 ]
 		then	
-			for (( j=1; j<=$N_CHAR_WIDTH; j++ )) 
+			for (( j=1; j<=$GAME_BOARD_N_CHAR_WIDTH; j++ )) 
 			do
-				[ $(( j % ( CELL_WIDTH + 1 ) )) -eq 1 ] && echo -n "+" || echo -n "-" 
+				[ $(( j % ( GAME_BOARD_CELL_WIDTH + 1 ) )) -eq 1 ] && echo -n "+" || echo -n "-" 
 			done
 		else
-			for (( j=1; j<=$N_CHAR_WIDTH; j++ )) 
+			for (( j=1; j<=$GAME_BOARD_N_CHAR_WIDTH; j++ )) 
 			do
-				[ $(( j % ( CELL_WIDTH + 1 ) )) -eq 1 ] && echo -n "|" || echo -n " " 
+				[ $(( j % ( GAME_BOARD_CELL_WIDTH + 1 ) )) -eq 1 ] && echo -n "|" || echo -n " " 
 			done
-			# do some shit
 		fi
-		echo	
 		(( cursor_x++ ))
+		(( cursor_y = init_cursor_y ))	
 		tput cup $cursor_x $cursor_y	
 	done
 }
 
-#print_keyboard() {
-#	#TODO: implement me :)
-#}
+# $1 == cursor_x $2 == cursor_y
+draw_keyboard() {
+	cursor_x=$1
+	(( cursor_x++ ))
+	init_cursor_y=$(( ( WIDTH / 2 ) - ( KEY_BOARD_N_CHAR_WIDTH / 2 ) ))
+	cursor_y=$init_cursor_y
+	tput cup $cursor_x $cursor_y
 
-init_game_screen() {
+	key_board_row_index=0
+	for (( i=1; i<=$KEY_BOARD_N_CHAR_HEIGHT; i++ ))	
+	do
+		
+		if [ $(( i % ( KEY_BOARD_CELL_HEIGHT + 1 ) )) -eq 1 ]
+		then	
+			for (( j=1; j<=$KEY_BOARD_N_CHAR_WIDTH; j++ )) 
+			do
+				[ $(( j % ( KEY_BOARD_CELL_WIDTH + 1 ) )) -eq 1 ] && echo -n "+" || echo -n "-" 
+			done
+		else
+			lett_index=0	
+			for (( j=1; j<=$KEY_BOARD_N_CHAR_WIDTH; j++ )) 
+			do
+				if [ $(( j % ( KEY_BOARD_CELL_WIDTH + 1 ) )) -eq 1 ]
+				then
+					echo -n "|"
+				else
+					char_row="${QWERTY_KEY_BOARD[$key_board_row_index]}"
+					if [ $(( ( j + 1 ) % ( KEY_BOARD_CELL_WIDTH + 1 ) )) -eq 0 ] && [ $lett_index -lt ${#char_row} ]
+					then
+						echo -n ${char_row:lett_index:1}
+						(( lett_index++ ))
+					else
+						echo -n " " 
+					fi
+				fi
+			done
+			(( key_board_row_index++ ))
+		fi
+		(( cursor_x++ ))
+		(( cursor_y = init_cursor_y ))	
+		tput cup $cursor_x $cursor_y	
+	done
+
+}
+
+draw_init_screen() {
 	clear	
 	local cursor_x=3
 	local cursor_y
 	(( cursor_y = WIDTH / 2 - ( ${#BORDLE_TEXT[1]} / 2 ) ))	
-	print_wordle_text $cursor_x $cursor_y	
+	draw_wordle_text $cursor_x $cursor_y	
 	
 	(( cursor_x += 2 ))
-	(( cursor_y = ( WIDTH / 2 ) - ( N_CHAR_WIDTH / 2 ) ))
-	print_empty_table $cursor_x $cursor_y
-#	# OPTIONAL: print_keyboard()	
+	(( cursor_y = ( WIDTH / 2 ) - ( GAME_BOARD_N_CHAR_WIDTH / 2 ) ))
+	draw_empty_table $cursor_x $cursor_y
+
+	(( cursor_x += 2 ))
+	(( cursor_y = ( WIDTH / 2 ) - ( GAME_BOARD_N_CHAR_WIDTH / 2 ) ))
+	draw_keyboard $cursor_x $cursor_y
 }
 
 # $1 == input $2 == char_stack $3 == guesses $4 == color_codes
-update_board() {
+redraw_board() {
 	input=$1	
 	char_stack=$2
 	guesses=$3
 	color_codes=$4
 	local cursor_x=$(( 3 + ${#BORDLE_TEXT[@]} + 2 + 1 ))
-	local cursor_y=$(( ( WIDTH / 2 ) - ( N_CHAR_WIDTH / 2 ) + 1 ))
+	local cursor_y=$(( ( WIDTH / 2 ) - ( GAME_BOARD_N_CHAR_WIDTH / 2 ) + 1 ))
 
 	ROW_NUM=$(( ( ${#guesses[@]} - 1 ) % 6 ))
 	COL_NUM=$(( ( ${#char_stack[@]} - 1 ) % 5 ))
-	(( cursor_x += ROW_NUM * ( CELL_HEIGHT + 1 ) ))
-	(( cursor_y += COL_NUM * ( CELL_WIDTH + 1 ) ))
+	(( cursor_x += ROW_NUM * ( GAME_BOARD_CELL_HEIGHT + 1 ) ))
+	(( cursor_y += COL_NUM * ( GAME_BOARD_CELL_WIDTH + 1 ) ))
 
 	case $input in
 		[a-z]) # user input letter
@@ -182,7 +234,7 @@ update_board() {
 			color_cells $char_stack $color_codes $ROW_NUM
 			;;
 		$'\177') # user wants to erase last letter
-			# (( cursor_y -= CELL_WIDTH + 1 )) 
+			# (( cursor_y -= GAME_BOARD_CELL_WIDTH + 1 )) 
 			# echo "backspace"	
 			unset char_stack[-1] 
 			tput cup $cursor_x $cursor_y
@@ -200,28 +252,28 @@ color_cells() {
 	char_stack=$1	
 	color_codes=$2
 	ROW_NUM=$3
-	local init_cursor_x=$(( 3 + ${#BORDLE_TEXT[@]} + 2 + 1 + ROW_NUM * ( CELL_HEIGHT + 1 ) ))
-	local init_cursor_y=$(( ( WIDTH / 2 ) - ( N_CHAR_WIDTH / 2 ) + 1 ))
+	local init_cursor_x=$(( 3 + ${#BORDLE_TEXT[@]} + 2 + 1 + ROW_NUM * ( GAME_BOARD_CELL_HEIGHT + 1 ) ))
+	local init_cursor_y=$(( ( WIDTH / 2 ) - ( GAME_BOARD_N_CHAR_WIDTH / 2 ) + 1 ))
 	local cursor_x=$init_cursor_x
 	local cursor_y=$init_cursor_y
 
-	for (( i=0;i<$N_CELL_WIDE;i++ ))
+	for (( i=0;i<$GAME_BOARD_NUM_CELL_WIDE;i++ ))
 	do
 		(( cursor_x = $init_cursor_x ))	
-		(( cursor_y = $init_cursor_y + $i * ( $CELL_WIDTH + 1 ) ))
+		(( cursor_y = $init_cursor_y + $i * ( $GAME_BOARD_CELL_WIDTH + 1 ) ))
 		# set background color, foreground color
 		tput setab ${color_codes[$i]}	
-		for (( j=0;j<$CELL_WIDTH;j++ ))
+		for (( j=0;j<$GAME_BOARD_CELL_WIDTH;j++ ))
 		do
 			(( cursor_y += $j ))
-			for (( k=0;k<$CELL_HEIGHT;k++ ))
+			for (( k=0;k<$GAME_BOARD_CELL_HEIGHT;k++ ))
 			do
 				(( cursor_x += $k ))
 				tput cup $cursor_x $cursor_y
 				[ $j -eq 0 ] && [ $k -eq 0 ] && echo "${char_stack[$i]}" || echo " "
 				(( cursor_x = $init_cursor_x))	
 			done
-			(( cursor_y = $init_cursor_y + $i * ( $CELL_WIDTH + 1 ) ))
+			(( cursor_y = $init_cursor_y + $i * ( $GAME_BOARD_CELL_WIDTH + 1 ) ))
 			sleep 0.05 
 		done
 	done
@@ -229,9 +281,9 @@ color_cells() {
 }
 
 # $1 == status_msg
-update_status() {
+draw_game_status() {
 	status_msg=$1
-	local init_cursor_x=$(( 3 + ${#BORDLE_TEXT[@]} + 2 + 1 + N_CHAR_HEIGHT ))
+	local init_cursor_x=$(( 3 + ${#BORDLE_TEXT[@]} + 2 + 1 + GAME_BOARD_N_CHAR_HEIGHT ))
 	local init_cursor_y=0 
 	local cursor_x=$init_cursor_x
 	local cursor_y=$init_cursor_y 
@@ -244,8 +296,8 @@ update_status() {
 	echo "$status_msg"
 }
 
-print_exit_screen() {
-	local init_cursor_x=$(( 3 + ${#BORDLE_TEXT[@]} + 2 + 1 + N_CHAR_HEIGHT + 2 ))
+draw_exit_status() {
+	local init_cursor_x=$(( 3 + ${#BORDLE_TEXT[@]} + 2 + 1 + GAME_BOARD_N_CHAR_HEIGHT + 2 ))
 	local init_cursor_y=0 
 	local cursor_x=$init_cursor_x
 	local cursor_y=$init_cursor_y 
@@ -287,7 +339,7 @@ validate_guess() {
 		exit_status=0	
 	fi
 	
-	[ $exit_status -eq 1 ] && update_status "$status_msg"	
+	[ $exit_status -eq 1 ] && draw_game_status "$status_msg"	
 	return $exit_status	
 }
 
@@ -305,7 +357,7 @@ win_or_lose() {
 	else
 		exit_status=1	
 	fi
-	update_status "$status_msg" && return $exit_status
+	draw_game_status "$status_msg" && return $exit_status
 }
 
 # FIXME: VERY BAD CODING PRACTICE: YIKES FUNCTION BELOW
@@ -402,13 +454,14 @@ played_today() {
 	fi
 }
 
-print_welcome_screen
+draw_welcome_screen
 
+# TODO: currently this feature is not working. Plz fix it.
 if [ $( played_today ) -eq 0 ]
 then
 	echo [ERROR] Already played today. See you tomorrow :\)	
 else
-	init_game_screen	
+	draw_init_screen	
 	
 	num_guess=0
 	declare -a guesses
@@ -425,7 +478,7 @@ else
 					continue
 				else	
 					char_stack+=( $user_input )
-					update_board $user_input $char_stack $guesses $color_codes	
+					redraw_board $user_input $char_stack $guesses $color_codes	
 				fi
 				;;
 			"") # user looking to verify guess
@@ -436,7 +489,7 @@ else
 					then
 						compare_guess_to_word $guess $WORD $color_codes
 						user_input="\n"	
-						update_board $user_input $char_stack $guesses $color_codes
+						redraw_board $user_input $char_stack $guesses $color_codes
 						guesses+=( $guess )
 						(( num_guess++ ))
 						
@@ -450,7 +503,7 @@ else
 				fi
 				;;
 			$'\177') # user wants to remove a letter
-				[ ${#char_stack[@]} -ne 0 ] && update_board $user_input $char_stack $guesses $color_codes
+				[ ${#char_stack[@]} -ne 0 ] && redraw_board $user_input $char_stack $guesses $color_codes
 				;;
 			*)
 				;;
@@ -460,7 +513,7 @@ else
 	serialize_data $guess $date_last_played $num_guess $GAME_DATA_FILE
 fi
 # reset_game_data $GAME_DATA_FILE # for debugging
-print_exit_screen
+draw_exit_status
 # TODO: create user-reachable context menu to display char guessed
 #		and their approp highlights, in QWERTY layout
 # TODO: create a man page or -h --help -u --usage page for commands
