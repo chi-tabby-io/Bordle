@@ -417,7 +417,7 @@ win_or_lose() {
 	local exit_status	
 	if [ $1 = $WORD ]
 	then
-		status_msg="You won! Congrats 😎)"
+		status_msg="You won! Congrats 😎"
 		exit_status=0	
 	elif [ $2 -eq 6 ]
 	then
@@ -508,30 +508,26 @@ serialize_data() {
 	sed -i "s/$games_played_info/games_played : $games_played/" $4	
 }
 
-date_last_played=$( cat $GAME_DATA_FILE  | grep "^date" | awk '{print $3}' ) 
+
 DATE=$( date +%s )
-TIME_DIFF=$(( $DATE - $date_last_played ))
-OFFSET=$( date +%::z | awk -F: '{print ($1 * 3600) + ($2 * 60) + $3}' )
-TIME_LEFT_TODAY=$(( 86400 - (( $date_last_played + $OFFSET ) % 86400 ) ))
 
 played_today() {
-		if [ $TIME_DIFF -lt $TIME_LEFT_TODAY ]
-	then
-		return 0
-	else
-		return 1 
-	fi
+
+	date_last_played=$( cat $GAME_DATA_FILE  | grep "^date" | awk '{print $3}' ) 
+	TIME_DIFF=$(( $DATE - $date_last_played ))
+	OFFSET=$( date +%::z | awk -F: '{print ($1 * 3600) + ($2 * 60) + $3}' )
+	TIME_LEFT_TODAY=$(( 86400 - (( $date_last_played + $OFFSET ) % 86400 ) ))
+	[ $TIME_DIFF -lt $TIME_LEFT_TODAY ] && return 
+	false
 }
 
-tput civis	
-
-draw_welcome_screen
-
-# TODO: currently this feature is not working. Plz fix it.
-if [ $( played_today ) -eq 0 ]
+if played_today
 then
-	echo [ERROR] Already played today. See you tomorrow :\)	
+	echo Already played today. See you tomorrow 😅	
+	exit 0
 else
+	tput civis	
+	draw_welcome_screen
 	draw_init_screen	
 	
 	num_guess=0
@@ -586,7 +582,7 @@ else
 	date_last_played=$DATE
 	serialize_data $guess $date_last_played $num_guess $GAME_DATA_FILE
 fi
-# reset_game_data $GAME_DATA_FILE # for debugging
+reset_game_data $GAME_DATA_FILE # for debugging
 draw_exit_status
 
 tput cnorm
