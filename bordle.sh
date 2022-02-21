@@ -297,8 +297,8 @@ color_keyboard_cells() {
 	for (( i=0;i<${#QWERTY_KEY_BOARD[@]};i++ ))
 	do
 		cursor_y=$init_cursor_y	
-		
 		qwerty_line=${QWERTY_KEY_BOARD[i]}
+		
 		for (( j=0;j<${#qwerty_line};j++))
 		do
 			lett=${qwerty_line:j:1}
@@ -521,9 +521,11 @@ played_today() {
 	false
 }
 
+# ================================ MAIN GAME =======================================
+
 if played_today
 then
-	echo Already played today. See you tomorrow 😅	
+	echo "Already played today. See you tomorrow 😅"	
 	exit 0
 else
 	tput civis	
@@ -586,8 +588,6 @@ reset_game_data $GAME_DATA_FILE # for debugging
 draw_exit_status
 
 tput cnorm
-# TODO: create user-reachable context menu to display char guessed
-#		and their approp highlights, in QWERTY layout
 # TODO: create a man page or -h --help -u --usage page for commands
 #		available to user
 # TODO: expand so that multiple users can play game, info serialized and queried on per-player basis
