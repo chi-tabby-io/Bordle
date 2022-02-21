@@ -156,6 +156,7 @@ draw_keyboard() {
 	tput cup $cursor_x $cursor_y
 
 	key_board_row_index=0
+
 	for (( i=1; i<=$KEY_BOARD_N_CHAR_HEIGHT; i++ ))	
 	do
 		
@@ -173,6 +174,8 @@ draw_keyboard() {
 				then
 					echo -n "|"
 				else
+					tput setaf 0	
+					tput setab 6	
 					char_row="${QWERTY_KEY_BOARD[$key_board_row_index]}"
 					if [ $(( ( j + 1 ) % ( KEY_BOARD_CELL_WIDTH + 1 ) )) -eq 0 ] && [ $lett_index -lt ${#char_row} ]
 					then
@@ -181,6 +184,8 @@ draw_keyboard() {
 					else
 						echo -n " " 
 					fi
+					tput setaf 9	
+					tput setab 9
 				fi
 			done
 			(( key_board_row_index++ ))
@@ -231,7 +236,7 @@ redraw_board() {
 		"\n") # user wants to validate guess
 			# not reaching this code ==> rethink how to detect newline	
 			# echo "enter"	
-			color_cells $char_stack $color_codes $ROW_NUM
+			color_board_cells $char_stack $color_codes $ROW_NUM
 			;;
 		$'\177') # user wants to erase last letter
 			# (( cursor_y -= GAME_BOARD_CELL_WIDTH + 1 )) 
@@ -248,7 +253,7 @@ redraw_board() {
 }
 
 # $1 == char_stack $2 == color_codes $3 == ROW_NUM
-color_cells() {
+color_board_cells() {
 	char_stack=$1	
 	color_codes=$2
 	ROW_NUM=$3
@@ -280,6 +285,51 @@ color_cells() {
  	tput sgr0
 }
 
+# $1 == seen $2 == color_codes
+color_keyboard_cells() {
+	#TODO: implement corresponding colors	
+	local init_cursor_x=$(( 3 + ${#BORDLE_TEXT[@]} + 2 + 1 + GAME_BOARD_NUM_CELL_HIGH * ( GAME_BOARD_CELL_HEIGHT + 1 ) + 4 ))
+	local init_cursor_y=$(( ( WIDTH / 2 ) - ( KEY_BOARD_N_CHAR_WIDTH / 2 ) + 2 ))
+	local cursor_x=$init_cursor_x
+	local cursor_y
+	seen=$1	
+
+	for (( i=0;i<${#QWERTY_KEY_BOARD[@]};i++ ))
+	do
+		cursor_y=$init_cursor_y	
+		
+		qwerty_line=${QWERTY_KEY_BOARD[i]}
+		for (( j=0;j<${#qwerty_line};j++))
+		do
+			lett=${qwerty_line:j:1}
+			for (( k=0;k<${#seen[@]};k++))
+			do
+				if [ "$lett" != "${seen[$k]}" ]
+				then 
+					continue
+				else
+					# do not recommend this kind of coding to anyone	
+					(( cursor_y-- ))	
+					tput cup $cursor_x $cursor_y
+					tput setaf 9
+					tput setab 9
+					echo -n " "
+					(( cursor_y++ ))	
+					tput cup $cursor_x $cursor_y
+					echo -n "$lett"	
+					(( cursor_y++ ))	
+					tput cup $cursor_x $cursor_y
+					echo -n " "
+					(( cursor_y-- ))	
+					break
+				fi
+			done
+			(( cursor_y += KEY_BOARD_CELL_WIDTH + 1 ))
+		done
+		(( cursor_x += KEY_BOARD_CELL_HEIGHT + 1 ))
+	done	
+	tput sgr0	
+}
 # $1 == status_msg
 draw_game_status() {
 	status_msg=$1
@@ -343,12 +393,31 @@ validate_guess() {
 	return $exit_status	
 }
 
+# $1 == $guess $2 == $seen
+add_to_seen() {
+	guess=$1
+	seen=$1
+	local seen_bool
+	
+	for (( i=0;i<${#guess};i++ ))
+	do
+		j=0
+		while true
+		do
+			[ $j -eq ${#seen[@]} ] && seen_bool=0 && break
+			[ "${guess:i:1}" = "${seen[$j]}" ] && seen_bool=1 && break
+			(( j++ ))	
+		done
+		[ $seen_bool -eq 0 ] && seen+=( "${guess:i:1}" )	
+	done	
+}
+
 win_or_lose() {
 	local status_msg	
 	local exit_status	
 	if [ $1 = $WORD ]
 	then
-		status_msg="You won! Congrats :)"
+		status_msg="You won! Congrats 😎)"
 		exit_status=0	
 	elif [ $2 -eq 6 ]
 	then
@@ -454,6 +523,8 @@ played_today() {
 	fi
 }
 
+tput civis	
+
 draw_welcome_screen
 
 # TODO: currently this feature is not working. Plz fix it.
@@ -467,7 +538,8 @@ else
 	declare -a guesses
 	declare -a char_stack	
 	declare -a color_codes	
-	
+	declare -a seen	
+
 	while true
 	do
 		IFS= read -r -s -n 1 user_input
@@ -490,6 +562,8 @@ else
 						compare_guess_to_word $guess $WORD $color_codes
 						user_input="\n"	
 						redraw_board $user_input $char_stack $guesses $color_codes
+						add_to_seen $guess $seen	
+						color_keyboard_cells $seen	
 						guesses+=( $guess )
 						(( num_guess++ ))
 						
@@ -514,6 +588,8 @@ else
 fi
 # reset_game_data $GAME_DATA_FILE # for debugging
 draw_exit_status
+
+tput cnorm
 # TODO: create user-reachable context menu to display char guessed
 #		and their approp highlights, in QWERTY layout
 # TODO: create a man page or -h --help -u --usage page for commands
