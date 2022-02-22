@@ -285,34 +285,41 @@ color_board_cells() {
  	tput sgr0
 }
 
-# $1 == seen $2 == color_codes
+# $1 == char_stack $2 == color_codes
 color_keyboard_cells() {
-	#TODO: implement corresponding colors	
+	#FIXME: _color_codes should not be made into an ordered set
+	#TODO: redo coupled char_stack and color_codes logic into a single associative array	
+	declare -a char_stack_set
+	declare -a color_codes_set
+	local -n _char_stack=$1
+	local -n _color_codes=$2	
+	to_ordered_set _char_stack char_stack_set
+	to_ordered_set _color_codes color_codes_set	
+	echo "${char_stack_set[@]}"
+	echo "${color_codes_set[@]}"
+	sleep 5	
 	local init_cursor_x=$(( 3 + ${#BORDLE_TEXT[@]} + 2 + 1 + GAME_BOARD_NUM_CELL_HIGH * ( GAME_BOARD_CELL_HEIGHT + 1 ) + 4 ))
 	local init_cursor_y=$(( ( WIDTH / 2 ) - ( KEY_BOARD_N_CHAR_WIDTH / 2 ) + 2 ))
 	local cursor_x=$init_cursor_x
 	local cursor_y
-	seen=$1	
-
+	
 	for (( i=0;i<${#QWERTY_KEY_BOARD[@]};i++ ))
 	do
-		cursor_y=$init_cursor_y	
-		qwerty_line=${QWERTY_KEY_BOARD[i]}
+		cursor_y=$init_cursor_y
+		char_row=${QWERTY_KEY_BOARD[i]}
 		
-		for (( j=0;j<${#qwerty_line};j++))
+		for (( j=0;j<${#char_row};j++))
 		do
-			lett=${qwerty_line:j:1}
-			for (( k=0;k<${#seen[@]};k++))
+			lett=${char_row:j:1}
+			for (( k=0;k<${#char_stack_set[@]};k++))
 			do
-				if [ "$lett" != "${seen[$k]}" ]
-				then 
-					continue
-				else
+				if in_arr $lett $char_stack_set 
+				then	
 					# do not recommend this kind of coding to anyone	
 					(( cursor_y-- ))	
 					tput cup $cursor_x $cursor_y
-					tput setaf 9
-					tput setab 9
+					tput setaf 7
+					tput setab ${color_codes_set[$k]}
 					echo -n " "
 					(( cursor_y++ ))	
 					tput cup $cursor_x $cursor_y
@@ -329,6 +336,7 @@ color_keyboard_cells() {
 		(( cursor_x += KEY_BOARD_CELL_HEIGHT + 1 ))
 	done	
 	tput sgr0	
+
 }
 # $1 == status_msg
 draw_game_status() {
@@ -412,6 +420,51 @@ add_to_seen() {
 	done	
 }
 
+# $1 == input
+type_of_var () {
+
+    local type_signature=$(declare -p "$1" 2>/dev/null)
+
+    if [[ "$type_signature" =~ "declare --" ]]; then
+        printf "string"
+    elif [[ "$type_signature" =~ "declare -a" ]]; then
+        printf "array"
+    elif [[ "$type_signature" =~ "declare -A" ]]; then
+        printf "map"
+    else
+        printf "none"
+    fi
+
+}
+
+# $1 == target $2 == container
+in_arr() {
+	local target=$1
+	local -n _array=$2	
+	if [ ${#_array[@]} -ne 0 ]
+	then	
+		for _element in "${_array[@]}"
+		do	
+			[ "$target" = "$_element" ] && return
+		done
+	fi
+	false
+}
+
+# $1 == arr $2 == ordered_set_arr
+to_ordered_set() {
+	local -n _arr=$1
+	local -n _ordered_set_arr=$2
+	
+	for _elem in "${_arr[@]}"
+	do
+		if ! in_arr $_elem _ordered_set_arr 
+		then
+			_ordered_set_arr+=( $_elem )
+		fi
+	done
+} 
+
 win_or_lose() {
 	local status_msg	
 	local exit_status	
@@ -443,6 +496,7 @@ won() {
 # tput colors to use:
 # green == 2
 # yellow == 3
+# default == 9
 # $1 == guess $2 == word $3 == color_codes
 compare_guess_to_word() { 
 	word=$2
@@ -455,7 +509,6 @@ compare_guess_to_word() {
 		if [[ $word =~ "$guess_i" ]]
 		then
 			match=0
-			match_pos=0
 			for (( j=0;j<${#word};j++ ))
 			do
 				if [ $guess_i = ${word:j:1} ] && [ $i -eq $j ]
@@ -464,16 +517,13 @@ compare_guess_to_word() {
 					break
 				fi
 			done
-			if [ $match -eq 1 ]
-			then
-				color_codes[$i]=2	
-			else
-				color_codes[$i]=3	
-			fi
+			[ $match -eq 1 ] && color_codes[$i]=2 || color_codes[$i]=3
 		else
 			color_codes[$i]=9 # might change this value later
 		fi
 	done
+	# echo "value of color_codes in function: ${color_codes[@]}"
+	sleep 2
 }
 
 # $1 == GAME_DATA_FILE
@@ -561,7 +611,11 @@ else
 						user_input="\n"	
 						redraw_board $user_input $char_stack $guesses $color_codes
 						add_to_seen $guess $seen	
-						color_keyboard_cells $seen	
+						
+						declare -a char_stack_ordered_set
+						declare -a color_codes_ordered_set
+					
+						color_keyboard_cells char_stack color_codes
 						guesses+=( $guess )
 						(( num_guess++ ))
 						
