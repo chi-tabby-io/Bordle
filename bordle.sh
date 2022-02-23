@@ -213,35 +213,30 @@ draw_init_screen() {
 	draw_keyboard $cursor_x $cursor_y
 }
 
-# $1 == input $2 == char_stack $3 == guesses $4 == color_codes
+# $1 == input $2 == char_stack $3 == guesses $4 == color_array
 redraw_board() {
-	input=$1	
-	char_stack=$2
-	guesses=$3
-	color_codes=$4
+	local input=$1	
+	local -n _char_stack=$2
+	local -n _guesses=$3
+	local -n _color_array=$4
 	local cursor_x=$(( 3 + ${#BORDLE_TEXT[@]} + 2 + 1 ))
 	local cursor_y=$(( ( WIDTH / 2 ) - ( GAME_BOARD_N_CHAR_WIDTH / 2 ) + 1 ))
-
-	ROW_NUM=$(( ( ${#guesses[@]} - 1 ) % 6 ))
-	COL_NUM=$(( ( ${#char_stack[@]} - 1 ) % 5 ))
+	
+	ROW_NUM=$(( ${#_guesses[@]} % 6 ))
+	COL_NUM=$(( ( ${#_char_stack[@]} - 1 ) % 5 ))
 	(( cursor_x += ROW_NUM * ( GAME_BOARD_CELL_HEIGHT + 1 ) ))
 	(( cursor_y += COL_NUM * ( GAME_BOARD_CELL_WIDTH + 1 ) ))
 
 	case $input in
 		[a-z]) # user input letter
-			# echo "alpha"	
 			tput cup $cursor_x $cursor_y
 			echo $input 
 			;;
 		"\n") # user wants to validate guess
-			# not reaching this code ==> rethink how to detect newline	
-			# echo "enter"	
-			color_board_cells $char_stack $color_codes $ROW_NUM
+			color_board_cells _char_stack _color_array $ROW_NUM
 			;;
 		$'\177') # user wants to erase last letter
-			# (( cursor_y -= GAME_BOARD_CELL_WIDTH + 1 )) 
-			# echo "backspace"	
-			unset char_stack[-1] 
+			unset _char_stack[-1] 
 			tput cup $cursor_x $cursor_y
 			echo " "
 			;;
@@ -252,11 +247,11 @@ redraw_board() {
 	esac
 }
 
-# $1 == char_stack $2 == color_codes $3 == ROW_NUM
+# $1 == char_stack $2 == color_array $3 == ROW_NUM
 color_board_cells() {
-	char_stack=$1	
-	color_codes=$2
-	ROW_NUM=$3
+	local -n __char_stack=$1	
+	local -n __color_array=$2
+	local ROW_NUM=$3
 	local init_cursor_x=$(( 3 + ${#BORDLE_TEXT[@]} + 2 + 1 + ROW_NUM * ( GAME_BOARD_CELL_HEIGHT + 1 ) ))
 	local init_cursor_y=$(( ( WIDTH / 2 ) - ( GAME_BOARD_N_CHAR_WIDTH / 2 ) + 1 ))
 	local cursor_x=$init_cursor_x
@@ -267,7 +262,7 @@ color_board_cells() {
 		(( cursor_x = $init_cursor_x ))	
 		(( cursor_y = $init_cursor_y + $i * ( $GAME_BOARD_CELL_WIDTH + 1 ) ))
 		# set background color, foreground color
-		tput setab ${color_codes[$i]}	
+		tput setab ${__color_array[$i]}	
 		for (( j=0;j<$GAME_BOARD_CELL_WIDTH;j++ ))
 		do
 			(( cursor_y += $j ))
@@ -275,51 +270,40 @@ color_board_cells() {
 			do
 				(( cursor_x += $k ))
 				tput cup $cursor_x $cursor_y
-				[ $j -eq 0 ] && [ $k -eq 0 ] && echo "${char_stack[$i]}" || echo " "
+				[ $j -eq 0 ] && [ $k -eq 0 ] && echo "${__char_stack[$i]}" || echo " "
 				(( cursor_x = $init_cursor_x))	
 			done
 			(( cursor_y = $init_cursor_y + $i * ( $GAME_BOARD_CELL_WIDTH + 1 ) ))
-			sleep 0.05 
+			sleep 0.03 
 		done
 	done
  	tput sgr0
 }
 
-# $1 == char_stack $2 == color_codes
+# $1 == color_map
 color_keyboard_cells() {
-	#FIXME: _color_codes should not be made into an ordered set
-	#TODO: redo coupled char_stack and color_codes logic into a single associative array	
-	declare -a char_stack_set
-	declare -a color_codes_set
-	local -n _char_stack=$1
-	local -n _color_codes=$2	
-	to_ordered_set _char_stack char_stack_set
-	to_ordered_set _color_codes color_codes_set	
-	echo "${char_stack_set[@]}"
-	echo "${color_codes_set[@]}"
-	sleep 5	
+	local -n _color_map=$1	
 	local init_cursor_x=$(( 3 + ${#BORDLE_TEXT[@]} + 2 + 1 + GAME_BOARD_NUM_CELL_HIGH * ( GAME_BOARD_CELL_HEIGHT + 1 ) + 4 ))
 	local init_cursor_y=$(( ( WIDTH / 2 ) - ( KEY_BOARD_N_CHAR_WIDTH / 2 ) + 2 ))
 	local cursor_x=$init_cursor_x
 	local cursor_y
-	
 	for (( i=0;i<${#QWERTY_KEY_BOARD[@]};i++ ))
 	do
 		cursor_y=$init_cursor_y
-		char_row=${QWERTY_KEY_BOARD[i]}
+		char_row=${QWERTY_KEY_BOARD[$i]}
 		
 		for (( j=0;j<${#char_row};j++))
 		do
 			lett=${char_row:j:1}
-			for (( k=0;k<${#char_stack_set[@]};k++))
+			for key in "${!_color_map[@]}"
 			do
-				if in_arr $lett $char_stack_set 
-				then	
+				if [ "$lett" = "$key" ] # an alternative is to get just keys array and check with in_arr
+				then
 					# do not recommend this kind of coding to anyone	
 					(( cursor_y-- ))	
 					tput cup $cursor_x $cursor_y
 					tput setaf 7
-					tput setab ${color_codes_set[$k]}
+					tput setab ${_color_map[$key]}
 					echo -n " "
 					(( cursor_y++ ))	
 					tput cup $cursor_x $cursor_y
@@ -327,10 +311,10 @@ color_keyboard_cells() {
 					(( cursor_y++ ))	
 					tput cup $cursor_x $cursor_y
 					echo -n " "
-					(( cursor_y-- ))	
-					break
+					(( cursor_y-- ))
+					break	
 				fi
-			done
+			done	
 			(( cursor_y += KEY_BOARD_CELL_WIDTH + 1 ))
 		done
 		(( cursor_x += KEY_BOARD_CELL_HEIGHT + 1 ))
@@ -374,22 +358,14 @@ draw_exit_status() {
 
 # $1 == guess $2 == guesses 
 validate_guess() {
-	guesses=$2	
+	local -n _guesses=$2	
 	local status_msg
 		
-	if [ ${#1} -ne 5 ] 
-	then
-		status_msg="Guess must be a 5 letter word"
-		exit_status=1	
-	elif ! [[ $1 =~ [a-z]{5} ]]
-	then
-		status_msg="Guess must be alphabetical only."	
-		exit_status=1	
-	elif ! grep -Fxq "$1" $FIVE_WORD_FILE
+	if ! grep -Fxq "$1" $FIVE_WORD_FILE
 	then
 		status_msg="'$1' was not found in word list!"
 		exit_status=1	
-	elif [[ ${guesses[*]} =~ (^|[[:space:]])"$1"($|[[:space:]]) ]] 
+	elif [[ ${_guesses[*]} =~ (^|[[:space:]])"$1"($|[[:space:]]) ]] 
 	then
 		status_msg="'$1' already guessed!"
 		exit_status=1
@@ -420,23 +396,6 @@ add_to_seen() {
 	done	
 }
 
-# $1 == input
-type_of_var () {
-
-    local type_signature=$(declare -p "$1" 2>/dev/null)
-
-    if [[ "$type_signature" =~ "declare --" ]]; then
-        printf "string"
-    elif [[ "$type_signature" =~ "declare -a" ]]; then
-        printf "array"
-    elif [[ "$type_signature" =~ "declare -A" ]]; then
-        printf "map"
-    else
-        printf "none"
-    fi
-
-}
-
 # $1 == target $2 == container
 in_arr() {
 	local target=$1
@@ -451,6 +410,7 @@ in_arr() {
 	false
 }
 
+#TODO: typechecking on input: either array or map
 # $1 == arr $2 == ordered_set_arr
 to_ordered_set() {
 	local -n _arr=$1
@@ -482,26 +442,26 @@ win_or_lose() {
 	draw_game_status "$status_msg" && return $exit_status
 }
 
-# FIXME: VERY BAD CODING PRACTICE: YIKES FUNCTION BELOW
 # $1 == guess $2 == num_guess
 won() {
-	if [[ $1 == $WORD && ! $2 > 6 ]] 
-	then
-		echo 0
-	else
-		echo 1
-	fi	
+	[[ $1 == $WORD && ! $2 > 6 ]] && return
+	false
 }
 
 # tput colors to use:
 # green == 2
-# yellow == 3
+# orange == 3
 # default == 9
-# $1 == guess $2 == word $3 == color_codes
-compare_guess_to_word() { 
-	word=$2
+# $1 == guess $2 == word $3 == color_map $4 == color_array
+get_color_mappings() { 
 	guess=$1
-	color_codes=$3
+	word=$2
+	local -n _color_map=$3
+	local -n _color_array=$4
+	unset _color_map[0] #when passing by name ref, initial key val pair of 0, none (?) is made	
+	unset _color_array[0]
+	local color_value=9	
+	
 	# echo [DEBUG] Word is \'$word\'
 	for (( i=0;i<${#guess};i++ ))
 	do
@@ -517,13 +477,24 @@ compare_guess_to_word() {
 					break
 				fi
 			done
-			[ $match -eq 1 ] && color_codes[$i]=2 || color_codes[$i]=3
-		else
-			color_codes[$i]=9 # might change this value later
+			if [ $match -eq 1 ]
+			then
+				color_value=2
+			else	
+				color_value=3	
+			fi
 		fi
+
+		#TODO: needs further debugging	
+		if [ "${_color_map[$guess_i]}" != "" ]
+		then
+			[ $color_value -lt ${_color_map[$guess_i]} ] && _color_map[$guess_i]=$color_value
+		else
+			_color_map[$guess_i]=$color_value
+		fi	
+		_color_array[$i]=$color_value
+		(( color_value=9 ))	
 	done
-	# echo "value of color_codes in function: ${color_codes[@]}"
-	sleep 2
 }
 
 # $1 == GAME_DATA_FILE
@@ -585,8 +556,8 @@ else
 	num_guess=0
 	declare -a guesses
 	declare -a char_stack	
-	declare -a color_codes	
-	declare -a seen	
+	declare -a color_array	
+	declare -A color_map	
 
 	while true
 	do
@@ -598,24 +569,21 @@ else
 					continue
 				else	
 					char_stack+=( $user_input )
-					redraw_board $user_input $char_stack $guesses $color_codes	
+					redraw_board $user_input char_stack guesses color_map	
 				fi
 				;;
 			"") # user looking to verify guess
 				if [ ${#char_stack[@]} -eq 5 ]
 				then
 					guess=$( echo ${char_stack[*]} | sed "s/\s*//g" )
-					if validate_guess $guess $guesses
+					if validate_guess $guess guesses
 					then
-						compare_guess_to_word $guess $WORD $color_codes
-						user_input="\n"	
-						redraw_board $user_input $char_stack $guesses $color_codes
-						add_to_seen $guess $seen	
+						get_color_mappings $guess $WORD color_map color_array
 						
-						declare -a char_stack_ordered_set
-						declare -a color_codes_ordered_set
+						user_input="\n"	
+						redraw_board $user_input char_stack guesses color_array
 					
-						color_keyboard_cells char_stack color_codes
+						color_keyboard_cells color_map
 						guesses+=( $guess )
 						(( num_guess++ ))
 						
@@ -624,12 +592,12 @@ else
 							break
 						fi
 						char_stack=()
-						color_codes=()
+						color_map=()
 					fi
 				fi
 				;;
 			$'\177') # user wants to remove a letter
-				[ ${#char_stack[@]} -ne 0 ] && redraw_board $user_input $char_stack $guesses $color_codes
+				[ ${#char_stack[@]} -ne 0 ] && redraw_board $user_input char_stack guesses color_map
 				;;
 			*)
 				;;
