@@ -5,7 +5,6 @@
 BASE_WORD_FILE=~/dict/english3.txt FIVE_WORD_FILE=~/dict/five_lett_dict.txt
 GAME_DATA_FILE=./wordle_game_data.txt
 
-# make sure we're looking at only five letter words
 if ! [ -s $FIVE_WORD_FILE ]
 then
 	touch $FIVE_WORD_FILE
