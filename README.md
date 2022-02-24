@@ -8,7 +8,8 @@ A Wordle Terminal User Interface (TUI) written entirely in Bash.
 
 ## Installation
 
-Installation is as simple as wget'ing the `bordle.sh` file.
+Installation is as simple as wget'ing the `bordle.sh` file. You can of course `git clone ` the project as well.
+It's your choice.
 
 ## Usage
 
@@ -23,6 +24,11 @@ or
 `sh bordle.sh`
 
 and you'll be impressing your friends with your (b)ordle skills in no time!
+
+## Bugs (TODOs)
+
+- If screen is smaller than 189 x 49, tput throws an `invalid option -- 3` error.
+- If screen is smaller than 210 x 57, keyboard at the bottom of the screen gets clipped
 
 ## License
  MIT License
