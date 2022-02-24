@@ -69,8 +69,8 @@ draw_welcome_screen() {
 	clear
 	welcome_str="Welcome to:"
 
-	local cursor_x=$((( HEIGHT / 6 ) -  6 ))
-	local cursor_y=$((( WIDTH / 2 ) - ( ${#welcome_str} / 2  )))
+	local cursor_x=$(( ( HEIGHT / 6 ) -  6 ))
+	local cursor_y=$(( ( WIDTH / 2 ) - ( ${#welcome_str} / 2  ) ))
 	tput cup $cursor_x $cursor_y
 	echo $welcome_str
 
@@ -338,12 +338,13 @@ draw_game_status() {
 }
 
 draw_exit_status() {
-	local init_cursor_x=$(( 3 + ${#BORDLE_TEXT[@]} + 2 + 1 + GAME_BOARD_N_CHAR_HEIGHT + 2 ))
-	local init_cursor_y=0 
-	local cursor_x=$init_cursor_x
-	local cursor_y=$init_cursor_y 
-	
-	tput cup $cursor_x $cursor_y
+	#TODO: replace the text drawn to screen	
+	#local init_cursor_x=$(( 3 + ${#BORDLE_TEXT[@]} + 2 + 1 + GAME_BOARD_N_CHAR_HEIGHT + 2 ))
+	#local init_cursor_y=0 
+	#local cursor_x=$init_cursor_x
+	#local cursor_y=$init_cursor_y 
+	#
+	#tput cup $cursor_x $cursor_y
 	
 	read -p "Press any key to exit" -rsn1 user_input
 	(( cursor_x++ ))	
@@ -351,6 +352,70 @@ draw_exit_status() {
 	echo "Exiting..."
 	sleep 0.75
 	clear
+}
+
+# $1 == GAME_DATA_FILE
+print_user_stats() {
+	clear
+	
+	max() {
+		local -n _guess_list=$1
+		maximum=${_guess_list[0]}
+		for num_guess in "${_guess_list[@]}"
+		do
+			[ $num_guess -gt $maximum ] && maximum=$num_guess
+		done
+		printf ${maximum}	
+	}	
+	
+	local -a guess_list	
+	local DIVISIONS=4
+	local guess_dist_str="GUESS DISTRIBUTION"
+	local init_cursor_x=0
+	local init_cursor_y=$(( (WIDTH / 2 ) - ( ${#guess_dist_str} / 2 ) ))	
+
+	local cursor_x=$init_cursor_x
+	local cursor_y=$init_cursor_y
+
+	local games_won=$( cat $1 | grep "^games_won" | awk '{print $3}' )
+	
+	for i in {1..6}	
+	do
+		guess_list+=( $( cat $1 | grep "games_in_$i" | awk '{print $3}' ) )	
+	done
+
+	local max_num_guess=$( max guess_list )	
+	local min_text_width=$(( ${#max_num_guess} + 3 ))	
+	tput cup $cursor_x $cursor_y 
+	printf "$guess_dist_str" 
+	(( cursor_x += 2 ))
+	
+	for i in {0..5}
+	do
+		(( cursor_x += 2 ))
+		(( cursor_y = WIDTH / DIVISIONS ))
+		
+		space_to_right=$(( WIDTH - cursor_y ))	
+		num_guess_i=${guess_list[$i]}  	
+		
+		num_bars=$(( num_guess_i * space_to_right * ( DIVISIONS - 1 ) / ( games_won * DIVISIONS ) ))	
+			
+		tput cup $cursor_x $cursor_y 
+		printf "%*s" $min_text_width "$num_guess_i | "
+	
+		(( cursor_y += min_text_width ))	
+		tput cup $cursor_x $cursor_y 
+		tput setab 2	
+		for (( j=0;j<=$num_bars;j++))
+		do
+			echo -n " "
+		done
+		tput setab 9
+	done
+	
+	(( cursor_x += 4 ))
+	tput cup $cursor_x $cursor_y 
+	# TODO: continue to develop statistics page
 }
 
 # ====================== UTILITY FUNCTIONS ==============================
@@ -605,10 +670,16 @@ else
 	date_last_played=$DATE
 	serialize_data $guess $date_last_played $num_guess $GAME_DATA_FILE
 fi
-reset_game_data $GAME_DATA_FILE # for debugging
+# reset_game_data $GAME_DATA_FILE # for debugging
+
+read -p "Press a Key when ready..." -rsn1 user_input
+
+print_user_stats $GAME_DATA_FILE
+
 draw_exit_status
 
 tput cnorm
+
 # TODO: create a man page or -h --help -u --usage page for commands
 #		available to user
 # TODO: expand so that multiple users can play game, info serialized and queried on per-player basis
