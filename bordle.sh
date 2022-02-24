@@ -3,7 +3,7 @@
 # global var definitions
 #TODO: perhaps search for the word file on Linux systems, else download the word file from a link
 BASE_WORD_FILE=~/dict/english3.txt FIVE_WORD_FILE=~/dict/five_lett_dict.txt
-GAME_DATA_FILE=./wordle_game_data.txt
+GAME_DATA_FILE=./user_data/wordle_game_data.txt
 
 if ! [ -s $FIVE_WORD_FILE ]
 then

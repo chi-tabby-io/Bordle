@@ -6,6 +6,9 @@
 
 A Wordle Terminal User Interface (TUI) written entirely in Bash.
 
+## Preview
+![Img](https://github.com/sean-gall-41/Bordle/blob/master/images/game_preview.png?raw=true)
+
 ## Installation
 
 Installation is as simple as wget'ing the `bordle.sh` file. You can of course `git clone ` the project as well.
@@ -25,7 +28,14 @@ or
 
 and you'll be impressing your friends with your (b)ordle skills in no time!
 
-## Bugs (TODOs)
+## Future Plans
+
+- Create an exit statistics screen akin to the original
+- Create a command line option to bring up the statistics screen without playing the game
+- Use a 5-letter dictionary of common words (as it stands, it is too difficult at the moment)
+- Allow for multiple users to play, have their data saved into respective files
+
+## Bugs 
 
 - If screen is smaller than 189 x 49, tput throws an `invalid option -- 3` error.
 - If screen is smaller than 210 x 57, keyboard at the bottom of the screen gets clipped

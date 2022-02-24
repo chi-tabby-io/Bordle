@@ -2,4 +2,4 @@ wordle_game_data.txt
 found_in.sh
 to_set.sh
 notes.md
-unset_assoc_array.sh
+.gitignore
