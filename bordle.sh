@@ -2,27 +2,83 @@
 
 # global var definitions
 #TODO: perhaps search for the word file on Linux systems, else download the word file from a link
-BASE_WORD_FILE=~/dict/english3.txt FIVE_WORD_FILE=~/dict/five_lett_dict.txt
-GAME_DATA_FILE=./user_data/wordle_game_data.txt
+DICT_DIR="$HOME/dict"
+BASE_WORD_FILE="$DICT_DIR/english3.txt" FIVE_WORD_FILE="$DICT_DIR/five_lett_dict.txt"
+USER_DATA_DIR="./user_data" GAME_DATA_FILE="./$USER_DATA_DIR/wordle_game_data.txt"
 
-if ! [ -s $FIVE_WORD_FILE ]
+# $1 == $GAME_DATA_FILE  
+init_game_data() {
+	# not checking whether file exists, only whether is non-empty, assume we created it	
+	if ! [ -s $1 ]
+	then
+		printf "date : 0\n" >> $1
+		printf "games_played : 0\n" >> $1	
+		printf "games_won : 0\n" >> $1 
+		for row in {1..6}
+		do
+			printf "games_in_$row : 0\n" >> $1
+		done
+	fi	
+
+}
+# $1 == GAME_DATA_FILE
+reset_game_data() {
+	sed -i "s/date : [0-9]*/date : 0/" $1
+	sed -i "s/games_played : [0-9]*/games_played : 0/" $1
+	sed -i "s/games_won : [0-9]*/games_won : 0/" $1	
+	for i in {1..6}
+	do
+		sed -i "s/games_in_$i : [0-9]*/games_in_$i : 0/" $1
+	done
+}
+
+if ! [ -d $USER_DATA_DIR ] && ! [ -s $GAME_DATA_FILE ] 
 then
-	touch $FIVE_WORD_FILE
-	egrep "^[a-z]{5}\$" $BASE_WORD_FILE > $FIVE_WORD_FILE
+	mkdir $USER_DATA_DIR	
+	touch $GAME_DATA_FILE
+	init_game_data $GAME_DATA_FILE
+	
+	if ! [ -d $DICT_DIR ] && ! [ -s $FIVE_WORD_FILE ] 
+	then
+		mkdir $DICT_DIR
+		touch $FIVE_WORD_FILE	
+	fi
 fi
 	
+egrep "^[a-z]{5}\$" $BASE_WORD_FILE > $FIVE_WORD_FILE
 WORD=$( shuf -n 1 $FIVE_WORD_FILE )
+
+# $1 == guess $2 == date_last_played $3 == num_guess $4 GAME_DATA_FILE 
+serialize_data() {
+	date_last_played_info=$( cat $4 | grep "^date" )
+	sed -i "s/$date_last_played_info/date : $2/" $4
+	if [[ $1 == $WORD && ! $3 > 6 ]] 
+	then
+		this_game_freq_info=$( cat $4 | grep "^games_in_$3" )
+		this_game_freq=$( echo $this_game_freq_info | awk '{print $3}' )
+		(( this_game_freq++ ))
+		sed -i "s/$this_game_freq_info/games_in_$3 : $this_game_freq/g" $4	
+		games_won_info=$( cat $4 | grep "^games_won" )
+		games_won=$( echo $games_won_info | awk '{print $3}' )
+		(( games_won++ ))
+		sed -i "s/$games_won_info/games_won : $games_won/" $4
+	fi
+	games_played_info=$( cat $4 | grep "^games_played" )
+	games_played=$( echo $games_played_info | awk '{print $3}' )
+	(( games_played++ ))
+	sed -i "s/$games_played_info/games_played : $games_played/" $4	
+}
 
 WIDTH=$( tput cols )
 HEIGHT=$( tput lines )
 
-declare -a BORDLE_TEXT	
-BORDLE_TEXT+=( "██████╗  ██████╗ ██████╗ ██████╗ ██╗     ███████╗" ) 
-BORDLE_TEXT+=( "██╔══██╗██╔═══██╗██╔══██╗██╔══██╗██║     ██╔════╝" )
-BORDLE_TEXT+=( "██████╔╝██║   ██║██████╔╝██║  ██║██║     █████╗  " )
-BORDLE_TEXT+=( "██╔══██╗██║   ██║██╔══██╗██║  ██║██║     ██╔══╝  " )
-BORDLE_TEXT+=( "██████╔╝╚██████╔╝██║  ██║██████╔╝███████╗███████╗" )
-BORDLE_TEXT+=( "╚═════╝  ╚═════╝ ╚═╝  ╚═╝╚═════╝ ╚══════╝╚══════╝" )
+declare -a BORDL_TEXT
+BORDL_TEXT+=( "▄▄███▄▄·██████╗  ██████╗ ██████╗ ██████╗ ██╗     " ) 
+BORDL_TEXT+=( "██╔════╝██╔══██╗██╔═══██╗██╔══██╗██╔══██╗██║     " ) 
+BORDL_TEXT+=( "███████╗██████╔╝██║   ██║██████╔╝██║  ██║██║     " ) 
+BORDL_TEXT+=( "╚════██║██╔══██╗██║   ██║██╔══██╗██║  ██║██║     " ) 
+BORDL_TEXT+=( "███████║██████╔╝╚██████╔╝██║  ██║██████╔╝███████╗" )
+BORDL_TEXT+=( "╚═▀▀▀══╝╚═════╝  ╚═════╝ ╚═╝  ╚═╝╚═════╝ ╚══════╝" )
 
 GAME_RULES_STR="Game Rules:"
 GAME_RULES_LEN=${#GAME_RULES_STR}
@@ -49,6 +105,7 @@ KEY_BOARD_N_CHAR_WIDTH=$(( KEY_BOARD_CELL_WIDTH * ${KEY_BOARD_NUM_CELL_WIDE[0]} 
 KEY_BOARD_N_CHAR_HEIGHT=$(( KEY_BOARD_CELL_HEIGHT * KEY_BOARD_NUM_CELL_HIGH + KEY_BOARD_NUM_CELL_HIGH + 1 ))
 
 QWERTY_KEY_BOARD=( "qwertyuiop" "asdfghjkl" "zxcvbnm" )
+
 # ========================= TUI FUNCTIONS ===============================
 
 # $1 == cursor_x $2 == cursor_y
@@ -57,7 +114,7 @@ draw_wordle_text() {
 	cursor_y=$2
 	
 	tput cup $cursor_x $cursor_y
-	for row in "${BORDLE_TEXT[@]}"
+	for row in "${BORDL_TEXT[@]}"
 	do
 		echo "$row"
 		(( cursor_x++ ))	
@@ -75,7 +132,7 @@ draw_welcome_screen() {
 	echo $welcome_str
 
 	(( cursor_x += 3 ))
-	(( cursor_y = ( WIDTH / 2 ) - ( ${#BORDLE_TEXT[1]} / 2 ) ))	
+	(( cursor_y = ( WIDTH / 2 ) - ( ${#BORDL_TEXT[1]} / 2 ) ))	
 	draw_wordle_text $cursor_x $cursor_y
 	
 	(( cursor_x += 2 ))	
@@ -200,7 +257,7 @@ draw_init_screen() {
 	clear	
 	local cursor_x=3
 	local cursor_y
-	(( cursor_y = WIDTH / 2 - ( ${#BORDLE_TEXT[1]} / 2 ) ))	
+	(( cursor_y = WIDTH / 2 - ( ${#BORDL_TEXT[1]} / 2 ) ))	
 	draw_wordle_text $cursor_x $cursor_y	
 	
 	(( cursor_x += 2 ))
@@ -218,7 +275,7 @@ redraw_board() {
 	local -n _char_stack=$2
 	local -n _guesses=$3
 	local -n _color_array=$4
-	local cursor_x=$(( 3 + ${#BORDLE_TEXT[@]} + 2 + 1 ))
+	local cursor_x=$(( 3 + ${#BORDL_TEXT[@]} + 2 + 1 ))
 	local cursor_y=$(( ( WIDTH / 2 ) - ( GAME_BOARD_N_CHAR_WIDTH / 2 ) + 1 ))
 	
 	ROW_NUM=$(( ${#_guesses[@]} % 6 ))
@@ -251,7 +308,7 @@ color_board_cells() {
 	local -n __char_stack=$1	
 	local -n __color_array=$2
 	local ROW_NUM=$3
-	local init_cursor_x=$(( 3 + ${#BORDLE_TEXT[@]} + 2 + 1 + ROW_NUM * ( GAME_BOARD_CELL_HEIGHT + 1 ) ))
+	local init_cursor_x=$(( 3 + ${#BORDL_TEXT[@]} + 2 + 1 + ROW_NUM * ( GAME_BOARD_CELL_HEIGHT + 1 ) ))
 	local init_cursor_y=$(( ( WIDTH / 2 ) - ( GAME_BOARD_N_CHAR_WIDTH / 2 ) + 1 ))
 	local cursor_x=$init_cursor_x
 	local cursor_y=$init_cursor_y
@@ -282,7 +339,7 @@ color_board_cells() {
 # $1 == color_map
 color_keyboard_cells() {
 	local -n _color_map=$1	
-	local init_cursor_x=$(( 3 + ${#BORDLE_TEXT[@]} + 2 + 1 + GAME_BOARD_NUM_CELL_HIGH * ( GAME_BOARD_CELL_HEIGHT + 1 ) + 4 ))
+	local init_cursor_x=$(( 3 + ${#BORDL_TEXT[@]} + 2 + 1 + GAME_BOARD_NUM_CELL_HIGH * ( GAME_BOARD_CELL_HEIGHT + 1 ) + 4 ))
 	local init_cursor_y=$(( ( WIDTH / 2 ) - ( KEY_BOARD_N_CHAR_WIDTH / 2 ) + 2 ))
 	local cursor_x=$init_cursor_x
 	local cursor_y
@@ -324,7 +381,7 @@ color_keyboard_cells() {
 # $1 == status_msg
 draw_game_status() {
 	status_msg=$1
-	local init_cursor_x=$(( 3 + ${#BORDLE_TEXT[@]} + 2 + 1 + GAME_BOARD_N_CHAR_HEIGHT ))
+	local init_cursor_x=$(( 3 + ${#BORDL_TEXT[@]} + 2 + 1 + GAME_BOARD_N_CHAR_HEIGHT ))
 	local init_cursor_y=0 
 	local cursor_x=$init_cursor_x
 	local cursor_y=$init_cursor_y 
@@ -339,7 +396,7 @@ draw_game_status() {
 
 draw_exit_status() {
 	#TODO: replace the text drawn to screen	
-	#local init_cursor_x=$(( 3 + ${#BORDLE_TEXT[@]} + 2 + 1 + GAME_BOARD_N_CHAR_HEIGHT + 2 ))
+	#local init_cursor_x=$(( 3 + ${#BORDL_TEXT[@]} + 2 + 1 + GAME_BOARD_N_CHAR_HEIGHT + 2 ))
 	#local init_cursor_y=0 
 	#local cursor_x=$init_cursor_x
 	#local cursor_y=$init_cursor_y 
@@ -378,14 +435,21 @@ print_user_stats() {
 	local cursor_y=$init_cursor_y
 
 	local games_won=$( cat $1 | grep "^games_won" | awk '{print $3}' )
-	
-	for i in {1..6}	
-	do
-		guess_list+=( $( cat $1 | grep "games_in_$i" | awk '{print $3}' ) )	
-	done
 
+	games_won=$( cat $1 | grep "games_won" | awk '{print $3}' )	
+	if [ $games_won -eq 0 ]
+	then
+		guess_list=( 0 0 0 0 0 0 )
+	else		
+		for i in {1..6}	
+		do
+			guess_list+=( $( cat $1 | grep "games_in_$i" | awk '{print $3}' ) )	
+		done
+	fi
+	
 	local max_num_guess=$( max guess_list )	
 	local min_text_width=$(( ${#max_num_guess} + 3 ))	
+	
 	tput cup $cursor_x $cursor_y 
 	printf "$guess_dist_str" 
 	(( cursor_x += 2 ))
@@ -398,18 +462,23 @@ print_user_stats() {
 		space_to_right=$(( WIDTH - cursor_y ))	
 		num_guess_i=${guess_list[$i]}  	
 		
-		num_bars=$(( num_guess_i * space_to_right * ( DIVISIONS - 1 ) / ( games_won * DIVISIONS ) ))	
 			
 		tput cup $cursor_x $cursor_y 
-		printf "%*s" $min_text_width "$num_guess_i | "
+		printf "%*s" $min_text_width "$(( i + 1 )) | "
 	
 		(( cursor_y += min_text_width ))	
 		tput cup $cursor_x $cursor_y 
 		tput setab 2	
-		for (( j=0;j<=$num_bars;j++))
-		do
-			echo -n " "
-		done
+		if [ $games_won -eq 0 ]
+		then	
+			echo -n " "	
+		else
+			num_bars=$(( num_guess_i * space_to_right * ( DIVISIONS - 1 ) / ( games_won * DIVISIONS ) ))	
+			for (( j=0;j<=$num_bars;j++))
+			do
+				echo -n " "
+			done
+		fi			
 		tput setab 9
 	done
 	
@@ -561,6 +630,21 @@ get_color_mappings() {
 	done
 }
 
+# $1 == $GAME_DATA_FILE  
+init_game_data() {
+	# not checking whether file exists, only whether is non-empty, assume we created it	
+	if ! [ -s $1 ]
+	then
+		printf "date : 0\n" >> $1
+		printf "games_played : 0\n" >> $1	
+		printf "games_won : 0\n" >> $1 
+		for row in {1..6}
+		do
+			printf "games_in_$row : 0\n" >> $1
+		done
+	fi	
+
+}
 # $1 == GAME_DATA_FILE
 reset_game_data() {
 	sed -i "s/date : [0-9]*/date : 0/" $1
@@ -593,8 +677,37 @@ serialize_data() {
 	sed -i "s/$games_played_info/games_played : $games_played/" $4	
 }
 
+#while getopts n:c: flag
+#do
+#    case "${flag}" in
+#          f) forget_date=${OPTARG};;
+#          #c) country=${OPTARG}
+#     esac
+#done
+#
+#
+#TEMP=$( getopt -o f --long forget-date )
+#
+#[ $? != 0 ] && echo "Terminating..." >&2 && exit 1 
+#
+#eval set -- "$TEMP"
+#
+#FORGET_DATE=false
+#
+#while true
+#do
+#	case "$1" in
+#		-f | --forget-date) FORGET_DATE=true; shift
+#			;;
+#		*)
+#			break
+#			;;
+#	esac
+#done
+#
+#[ $FORGET_DATE ] && sed -i "s/date : [0-9]*/date : 0/" $GAME_DATA_FILE
 
-DATE=$( date +%s )
+DATE=$( date +%s ) 
 
 played_today() {
 

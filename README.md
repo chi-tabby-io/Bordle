@@ -11,7 +11,7 @@ A Wordle Terminal User Interface (TUI) written entirely in Bash.
 
 ## Installation
 
-Installation is as simple as wget'ing the `bordle.sh` file. You can of course `git clone ` the project as well.
+Installation is as simple as wget'ing the `bordle.sh` file. You can of course `git clone` the project as well.
 It's your choice.
 
 ## Usage
@@ -32,6 +32,8 @@ and you'll be impressing your friends with your (b)ordle skills in no time!
 
 - Create an exit statistics screen akin to the original
 - Create a command line option to bring up the statistics screen without playing the game
+- Create a command line option that allows user to ignore 1 day limit
+- Create a command line option that allows user to specify a difficulty 
 - Use a 5-letter dictionary of common words (as it stands, it is too difficult at the moment)
 - Allow for multiple users to play, have their data saved into respective files
 
