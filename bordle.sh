@@ -9,6 +9,8 @@ declare FIVE_WORD_FILE="$DICT_DIR/words_five"
 declare USER_DATA_DIR="./user_data" 
 declare GAME_DATA_FILE="./$USER_DATA_DIR/wordle_game_data"
 
+declare DATE=$( date +%s ) 
+
 declare WIDTH=$( tput cols )
 declare HEIGHT=$( tput lines )
 
@@ -353,7 +355,6 @@ draw_exit_status() {
 	clear
 }
 
-# $1 == GAME_DATA_FILE
 draw_user_stats() {
 	clear
 	
@@ -367,6 +368,7 @@ draw_user_stats() {
 		printf ${maximum}	
 	}	
 	
+	local last_num_guess=$( cat $GAME_DATA_FILE | grep "^last_num_guess" | awk '{print $3}' )	
 	local -a guess_list	
 	local DIVISIONS=4
 	local guess_dist_str="GUESS DISTRIBUTION"
@@ -376,16 +378,16 @@ draw_user_stats() {
 	local cursor_x=$init_cursor_x
 	local cursor_y=$init_cursor_y
 
-	local games_won=$( cat $1 | grep "^games_won" | awk '{print $3}' )
+	local games_won=$( cat $GAME_DATA_FILE | grep "^games_won" | awk '{print $3}' )
 
-	games_won=$( cat $1 | grep "games_won" | awk '{print $3}' )	
+	games_won=$( cat $GAME_DATA_FILE | grep "games_won" | awk '{print $3}' )	
 	if [ $games_won -eq 0 ]
 	then
 		guess_list=( 0 0 0 0 0 0 )
 	else		
 		for i in {1..6}	
 		do
-			guess_list+=( $( cat $1 | grep "games_in_$i" | awk '{print $3}' ) )	
+			guess_list+=( $( cat $GAME_DATA_FILE | grep "games_in_$i" | awk '{print $3}' ) )	
 		done
 	fi
 	
@@ -404,13 +406,12 @@ draw_user_stats() {
 		space_to_right=$(( WIDTH - cursor_y ))	
 		num_guess_i=${guess_list[$i]}  	
 		
-			
 		tput cup $cursor_x $cursor_y 
 		printf "%*s" $min_text_width "$(( i + 1 )) | "
 	
 		(( cursor_y += min_text_width ))	
 		tput cup $cursor_x $cursor_y 
-		tput setab 2	
+		[ $last_num_guess -eq $(( i + 1 )) ] && tput setab 2 || tput setab 7	
 		if [ $games_won -eq 0 ]
 		then	
 			echo -n " "	
@@ -587,6 +588,7 @@ init_game_data() {
 		do
 			printf "games_in_$row : 0\n" >> $GAME_DATA_FILE
 		done
+		printf "last_num_guess : 0" >> $GAME_DATA_FILE
 	fi	
 	
 	if ! [ -d $DICT_DIR ] 
@@ -610,13 +612,14 @@ reset_game_data() {
 	do
 		sed -i "s/games_in_$i : [0-9]*/games_in_$i : 0/" $GAME_DATA_FILE 
 	done
+	sed -i "s/last_num_guess : [1-6]/last_num_guess : 0" $GAME_DATA_FILE
 }
 
 # $1 == guess $2 == date_last_played $3 == num_guess  
 serialize_data() {
 	date_last_played_info=$( cat $GAME_DATA_FILE | grep "^date" )
 	sed -i "s/$date_last_played_info/date : $2/" $GAME_DATA_FILE 
-	if [[ $1 == $WORD && ! $3 > 6 ]] 
+	if [ $1 == $WORD ] && ! [ $3 > 6 ] 
 	then
 		this_game_freq_info=$( cat $GAME_DATA_FILE | grep "^games_in_$3" )
 		this_game_freq=$( echo $this_game_freq_info | awk '{print $3}' )
@@ -631,38 +634,10 @@ serialize_data() {
 	games_played=$( echo $games_played_info | awk '{print $3}' )
 	(( games_played++ ))
 	sed -i "s/$games_played_info/games_played : $games_played/" $GAME_DATA_FILE
+	last_num_guess_info=$( cat $GAME_DATA_FILE | grep "^last_num_guess" )	
+	sed -i "s/$last_num_guess_info/last_num_guess : $3/" $GAME_DATA_FILE
 }
 
-#while getopts n:c: flag
-#do
-#    case "${flag}" in
-#          f) forget_date=${OPTARG};;
-#          #c) country=${OPTARG}
-#     esac
-#done
-#
-#TEMP=$( getopt -o f --long forget-date )
-#
-#[ $? != 0 ] && echo "Terminating..." >&2 && exit 1 
-#
-#eval set -- "$TEMP"
-#
-#FORGET_DATE=false
-#
-#while true
-#do
-#	case "$1" in
-#		-f | --forget-date) FORGET_DATE=true; shift
-#			;;
-#		*)
-#			break
-#			;;
-#	esac
-#done
-
-# $FORGET_DATE && sed -i "s/date : [0-9]*/date : 0/" $GAME_DATA_FILE
-
-DATE=$( date +%s ) 
 
 played_today() {
 
@@ -674,17 +649,60 @@ played_today() {
 	false
 }
 
+# processing command line arguments...
+
+TEMP=$( getopt -o hfs --long help,forget-date,stats -n "$0" -- "$@" )
+
+if [ $? != 0 ] 
+then
+	echo "To get help, use flags -h or --help"
+	echo "Terminating..." >&2 
+   	exit 1 
+fi
+
+eval set -- "$TEMP"
+
+declare forget_date=false
+
+while true
+do
+	case "$1" in
+		-h | --help)
+			printf "\nusage: ./bordle.sh [-h | --help] [-f | --forget-date] [-s | --stats]\n\n"
+			printf "\t-h, --help\t\tdisplay this message\n"
+			printf "\t-f, --forget-date\twhen included, allows user to play more than once a day\n"	
+			printf "\t-s, --stats\t\tdisplays the user stats\n\n"	
+			exit 0
+			break	
+			;;	
+		-f | --forget-date) forget_date=true 
+			shift
+			;;
+		-s | --stats)
+			draw_user_stats 
+			read -p "Press any key to exit..." -rsn1 user_input
+			clear	
+			exit 0
+			break	
+			;;
+		-- )
+			shift
+			break
+			;;	
+		*)
+			break
+			;;
+	esac
+done
+
 # ================================ MAIN GAME =======================================
 
 init_game_data
 
-WORD=$( shuf -n 1 $FIVE_WORD_FILE )
+declare WORD=$( shuf -n 1 $FIVE_WORD_FILE )
 
-if played_today
+if $forget_date || ! played_today
 then
-	echo "Already played today. See you tomorrow 😅"	
-	exit 0
-else
 	tput civis	
 	draw_welcome_screen
 	draw_init_screen	
@@ -741,17 +759,16 @@ else
 	done
 	date_last_played=$DATE
 	serialize_data $guess $date_last_played $num_guess $GAME_DATA_FILE
+
+	read -p "Press a Key when ready..." -rsn1 user_input
+
+	draw_user_stats 
+	draw_exit_status
+	tput cnorm
+	exit 0
+else
+	echo "Already played today. See you tomorrow 😅"	
+	exit 0
 fi
-# reset_game_data $GAME_DATA_FILE # for debugging
 
-read -p "Press a Key when ready..." -rsn1 user_input
-
-draw_user_stats $GAME_DATA_FILE
-
-draw_exit_status
-
-tput cnorm
-
-# TODO: create a man page or -h --help -u --usage page for commands
-#		available to user
 # TODO: expand so that multiple users can play game, info serialized and queried on per-player basis
