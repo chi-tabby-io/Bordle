@@ -1,76 +1,16 @@
 #!/bin/bash 
 
-# global var definitions
+# ============================ GLOBAL VAR DEFINITIONS ========================
+
 #TODO: perhaps search for the word file on Linux systems, else download the word file from a link
-DICT_DIR="$HOME/dict"
-BASE_WORD_FILE="$DICT_DIR/english3.txt" FIVE_WORD_FILE="$DICT_DIR/five_lett_dict.txt"
-USER_DATA_DIR="./user_data" GAME_DATA_FILE="./$USER_DATA_DIR/wordle_game_data.txt"
+declare DICT_DIR="./dict"
+declare BASE_WORD_FILE="$DICT_DIR/words" 
+declare FIVE_WORD_FILE="$DICT_DIR/words_five"
+declare USER_DATA_DIR="./user_data" 
+declare GAME_DATA_FILE="./$USER_DATA_DIR/wordle_game_data"
 
-# $1 == $GAME_DATA_FILE  
-init_game_data() {
-	# not checking whether file exists, only whether is non-empty, assume we created it	
-	if ! [ -s $1 ]
-	then
-		printf "date : 0\n" >> $1
-		printf "games_played : 0\n" >> $1	
-		printf "games_won : 0\n" >> $1 
-		for row in {1..6}
-		do
-			printf "games_in_$row : 0\n" >> $1
-		done
-	fi	
-
-}
-# $1 == GAME_DATA_FILE
-reset_game_data() {
-	sed -i "s/date : [0-9]*/date : 0/" $1
-	sed -i "s/games_played : [0-9]*/games_played : 0/" $1
-	sed -i "s/games_won : [0-9]*/games_won : 0/" $1	
-	for i in {1..6}
-	do
-		sed -i "s/games_in_$i : [0-9]*/games_in_$i : 0/" $1
-	done
-}
-
-if ! [ -d $USER_DATA_DIR ] && ! [ -s $GAME_DATA_FILE ] 
-then
-	mkdir $USER_DATA_DIR	
-	touch $GAME_DATA_FILE
-	init_game_data $GAME_DATA_FILE
-	
-	if ! [ -d $DICT_DIR ] && ! [ -s $FIVE_WORD_FILE ] 
-	then
-		mkdir $DICT_DIR
-		touch $FIVE_WORD_FILE	
-	fi
-fi
-	
-egrep "^[a-z]{5}\$" $BASE_WORD_FILE > $FIVE_WORD_FILE
-WORD=$( shuf -n 1 $FIVE_WORD_FILE )
-
-# $1 == guess $2 == date_last_played $3 == num_guess $4 GAME_DATA_FILE 
-serialize_data() {
-	date_last_played_info=$( cat $4 | grep "^date" )
-	sed -i "s/$date_last_played_info/date : $2/" $4
-	if [[ $1 == $WORD && ! $3 > 6 ]] 
-	then
-		this_game_freq_info=$( cat $4 | grep "^games_in_$3" )
-		this_game_freq=$( echo $this_game_freq_info | awk '{print $3}' )
-		(( this_game_freq++ ))
-		sed -i "s/$this_game_freq_info/games_in_$3 : $this_game_freq/g" $4	
-		games_won_info=$( cat $4 | grep "^games_won" )
-		games_won=$( echo $games_won_info | awk '{print $3}' )
-		(( games_won++ ))
-		sed -i "s/$games_won_info/games_won : $games_won/" $4
-	fi
-	games_played_info=$( cat $4 | grep "^games_played" )
-	games_played=$( echo $games_played_info | awk '{print $3}' )
-	(( games_played++ ))
-	sed -i "s/$games_played_info/games_played : $games_played/" $4	
-}
-
-WIDTH=$( tput cols )
-HEIGHT=$( tput lines )
+declare WIDTH=$( tput cols )
+declare HEIGHT=$( tput lines )
 
 declare -a BORDL_TEXT
 BORDL_TEXT+=( "▄▄███▄▄·██████╗  ██████╗ ██████╗ ██████╗ ██╗     " ) 
@@ -80,9 +20,10 @@ BORDL_TEXT+=( "╚════██║██╔══██╗██║   █�
 BORDL_TEXT+=( "███████║██████╔╝╚██████╔╝██║  ██║██████╔╝███████╗" )
 BORDL_TEXT+=( "╚═▀▀▀══╝╚═════╝  ╚═════╝ ╚═╝  ╚═╝╚═════╝ ╚══════╝" )
 
-GAME_RULES_STR="Game Rules:"
-GAME_RULES_LEN=${#GAME_RULES_STR}
+declare GAME_RULES_STR="Game Rules:"
+declare GAME_RULES_LEN=${#GAME_RULES_STR}
 
+declare INSTRUCTIONS
 INSTRUCTIONS+=( "1. I have come up with a 5 letter word. You must guess it correctly in 6 attempts.        " )
 INSTRUCTIONS+=( "2. After each attempt, I will give you feedback on your guess, according to the following:" )
 INSTRUCTIONS+=( "   a. If a letter is in the word but in the wrong position, I will mark it orange.        " )
@@ -90,23 +31,23 @@ INSTRUCTIONS+=( "   b. If a letter is in the word and in the correct position, I
 INSTRUCTIONS+=( "   c. If a letter is not in the word, I will not mark it at all.                          " )
 INSTRUCTIONS+=( "3. Repeats are allowed.                                                                   " )
 
-GAME_BOARD_CELL_WIDTH=10
-GAME_BOARD_CELL_HEIGHT=4
-GAME_BOARD_NUM_CELL_WIDE=5
-GAME_BOARD_NUM_CELL_HIGH=6
-GAME_BOARD_N_CHAR_WIDTH=$(( GAME_BOARD_CELL_WIDTH * GAME_BOARD_NUM_CELL_WIDE + GAME_BOARD_NUM_CELL_WIDE + 1 ))	
-GAME_BOARD_N_CHAR_HEIGHT=$(( GAME_BOARD_CELL_HEIGHT * GAME_BOARD_NUM_CELL_HIGH + GAME_BOARD_NUM_CELL_HIGH + 1 )) 
+declare GAME_BOARD_CELL_WIDTH=10
+declare GAME_BOARD_CELL_HEIGHT=4
+declare GAME_BOARD_NUM_CELL_WIDE=5
+declare GAME_BOARD_NUM_CELL_HIGH=6
+declare GAME_BOARD_N_CHAR_WIDTH=$(( GAME_BOARD_CELL_WIDTH * GAME_BOARD_NUM_CELL_WIDE + GAME_BOARD_NUM_CELL_WIDE + 1 ))	
+declare GAME_BOARD_N_CHAR_HEIGHT=$(( GAME_BOARD_CELL_HEIGHT * GAME_BOARD_NUM_CELL_HIGH + GAME_BOARD_NUM_CELL_HIGH + 1 )) 
 
-KEY_BOARD_CELL_WIDTH=3
-KEY_BOARD_CELL_HEIGHT=1
-KEY_BOARD_NUM_CELL_WIDE=( 10 9 7 )
-KEY_BOARD_NUM_CELL_HIGH=3
-KEY_BOARD_N_CHAR_WIDTH=$(( KEY_BOARD_CELL_WIDTH * ${KEY_BOARD_NUM_CELL_WIDE[0]} + ${KEY_BOARD_NUM_CELL_WIDE[0]} + 1 ))
-KEY_BOARD_N_CHAR_HEIGHT=$(( KEY_BOARD_CELL_HEIGHT * KEY_BOARD_NUM_CELL_HIGH + KEY_BOARD_NUM_CELL_HIGH + 1 ))
+declare KEY_BOARD_CELL_WIDTH=3
+declare KEY_BOARD_CELL_HEIGHT=1
+declare KEY_BOARD_NUM_CELL_WIDE=( 10 9 7 )
+declare KEY_BOARD_NUM_CELL_HIGH=3
+declare KEY_BOARD_N_CHAR_WIDTH=$(( KEY_BOARD_CELL_WIDTH * ${KEY_BOARD_NUM_CELL_WIDE[0]} + ${KEY_BOARD_NUM_CELL_WIDE[0]} + 1 ))
+declare KEY_BOARD_N_CHAR_HEIGHT=$(( KEY_BOARD_CELL_HEIGHT * KEY_BOARD_NUM_CELL_HIGH + KEY_BOARD_NUM_CELL_HIGH + 1 ))
 
-QWERTY_KEY_BOARD=( "qwertyuiop" "asdfghjkl" "zxcvbnm" )
+declare QWERTY_KEY_BOARD=( "qwertyuiop" "asdfghjkl" "zxcvbnm" )
 
-# ========================= TUI FUNCTIONS ===============================
+# ========================= DRAWING FUNCTIONS ===============================
 
 # $1 == cursor_x $2 == cursor_y
 draw_wordle_text() {
@@ -378,6 +319,7 @@ color_keyboard_cells() {
 	tput sgr0	
 
 }
+
 # $1 == status_msg
 draw_game_status() {
 	status_msg=$1
@@ -412,7 +354,7 @@ draw_exit_status() {
 }
 
 # $1 == GAME_DATA_FILE
-print_user_stats() {
+draw_user_stats() {
 	clear
 	
 	max() {
@@ -558,6 +500,7 @@ to_ordered_set() {
 	done
 } 
 
+# $1 == guess $2 == num_guess
 win_or_lose() {
 	local status_msg	
 	local exit_status	
@@ -630,51 +573,64 @@ get_color_mappings() {
 	done
 }
 
-# $1 == $GAME_DATA_FILE  
+# ========================== GAME DATA MANIPULATION ============================
+
 init_game_data() {
-	# not checking whether file exists, only whether is non-empty, assume we created it	
-	if ! [ -s $1 ]
+	if ! [ -d $USER_DATA_DIR ] && ! [ -s $GAME_DATA_FILE ] 
 	then
-		printf "date : 0\n" >> $1
-		printf "games_played : 0\n" >> $1	
-		printf "games_won : 0\n" >> $1 
+		mkdir $USER_DATA_DIR	
+		touch "$GAME_DATA_FILE"
+		printf "date : 0\n" >> $GAME_DATA_FILE
+		printf "games_played : 0\n" >> $GAME_DATA_FILE	
+		printf "games_won : 0\n" >> $GAME_DATA_FILE 
 		for row in {1..6}
 		do
-			printf "games_in_$row : 0\n" >> $1
+			printf "games_in_$row : 0\n" >> $GAME_DATA_FILE
 		done
 	fi	
-
+	
+	if ! [ -d $DICT_DIR ] 
+	then
+		mkdir $DICT_DIR
+		# wget base word file, change name to base word file if nec	
+		touch "$BASE_WORD_FILE"
+		touch "$FIVE_WORD_FILE"	
+		wget -q 'https://users.cs.duke.edu/~ola/ap/linuxwords'	
+		cat linuxwords > "$BASE_WORD_FILE"	
+		egrep "^[a-z]{5}\$" "$BASE_WORD_FILE" > "$FIVE_WORD_FILE"
+		rm linuxwords
+	fi
 }
-# $1 == GAME_DATA_FILE
+
 reset_game_data() {
-	sed -i "s/date : [0-9]*/date : 0/" $1
-	sed -i "s/games_played : [0-9]*/games_played : 0/" $1
-	sed -i "s/games_won : [0-9]*/games_won : 0/" $1	
+	sed -i "s/date : [0-9]*/date : 0/" $GAME_DATA_FILE 
+	sed -i "s/games_played : [0-9]*/games_played : 0/" $GAME_DATA_FILE 
+	sed -i "s/games_won : [0-9]*/games_won : 0/" $GAME_DATA_FILE	
 	for i in {1..6}
 	do
-		sed -i "s/games_in_$i : [0-9]*/games_in_$i : 0/" $1
+		sed -i "s/games_in_$i : [0-9]*/games_in_$i : 0/" $GAME_DATA_FILE 
 	done
 }
 
-# $1 == guess $2 == date_last_played $3 == num_guess $4 GAME_DATA_FILE 
+# $1 == guess $2 == date_last_played $3 == num_guess  
 serialize_data() {
-	date_last_played_info=$( cat $4 | grep "^date" )
-	sed -i "s/$date_last_played_info/date : $2/" $4
+	date_last_played_info=$( cat $GAME_DATA_FILE | grep "^date" )
+	sed -i "s/$date_last_played_info/date : $2/" $GAME_DATA_FILE 
 	if [[ $1 == $WORD && ! $3 > 6 ]] 
 	then
-		this_game_freq_info=$( cat $4 | grep "^games_in_$3" )
+		this_game_freq_info=$( cat $GAME_DATA_FILE | grep "^games_in_$3" )
 		this_game_freq=$( echo $this_game_freq_info | awk '{print $3}' )
 		(( this_game_freq++ ))
-		sed -i "s/$this_game_freq_info/games_in_$3 : $this_game_freq/g" $4	
-		games_won_info=$( cat $4 | grep "^games_won" )
+		sed -i "s/$this_game_freq_info/games_in_$3 : $this_game_freq/g" $GAME_DATA_FILE	
+		games_won_info=$( cat $GAME_DATA_FILE | grep "^games_won" )
 		games_won=$( echo $games_won_info | awk '{print $3}' )
 		(( games_won++ ))
-		sed -i "s/$games_won_info/games_won : $games_won/" $4
+		sed -i "s/$games_won_info/games_won : $games_won/" $GAME_DATA_FILE 
 	fi
-	games_played_info=$( cat $4 | grep "^games_played" )
+	games_played_info=$( cat $GAME_DATA_FILE | grep "^games_played" )
 	games_played=$( echo $games_played_info | awk '{print $3}' )
 	(( games_played++ ))
-	sed -i "s/$games_played_info/games_played : $games_played/" $4	
+	sed -i "s/$games_played_info/games_played : $games_played/" $GAME_DATA_FILE
 }
 
 #while getopts n:c: flag
@@ -684,7 +640,6 @@ serialize_data() {
 #          #c) country=${OPTARG}
 #     esac
 #done
-#
 #
 #TEMP=$( getopt -o f --long forget-date )
 #
@@ -704,8 +659,8 @@ serialize_data() {
 #			;;
 #	esac
 #done
-#
-#[ $FORGET_DATE ] && sed -i "s/date : [0-9]*/date : 0/" $GAME_DATA_FILE
+
+# $FORGET_DATE && sed -i "s/date : [0-9]*/date : 0/" $GAME_DATA_FILE
 
 DATE=$( date +%s ) 
 
@@ -720,6 +675,10 @@ played_today() {
 }
 
 # ================================ MAIN GAME =======================================
+
+init_game_data
+
+WORD=$( shuf -n 1 $FIVE_WORD_FILE )
 
 if played_today
 then
@@ -787,7 +746,7 @@ fi
 
 read -p "Press a Key when ready..." -rsn1 user_input
 
-print_user_stats $GAME_DATA_FILE
+draw_user_stats $GAME_DATA_FILE
 
 draw_exit_status
 
